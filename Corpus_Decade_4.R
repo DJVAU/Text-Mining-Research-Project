@@ -1,6 +1,7 @@
 library(tm)
 library(tidyverse)
 library(tidytext)
+library(tidyr)
 
 ## IMPORT THE DATA
 allthesongs <- read.csv("BillboardHot100_Lyrics_1965-2015.csv", stringsAsFactors=FALSE)
@@ -58,5 +59,62 @@ ggplot(freq.df.4[1:25,], aes(x=word,y=frequency)) + geom_bar(stat="identity",fil
     coord_flip() +
     geom_text(aes(label=frequency),colour="white",hjust=1.25, size=5.0)
 
+# Download two of the three seperate lexicons in the sentiment dictionary
+
+get_sentiments("bing") 
+get_sentiments("nrc")
+
+# Create Document Term Matrix for Sentiment Analysis
+
+dtm_4 <- DocumentTermMatrix(corpus_4)
+
+# Tidy dtm and assign it to new tidy object
+
+dtm_4_td <- tidy(dtm_4)
+
+# Create object called bing_dtm_sentiment to conduct sentiment analysis of entire lyrics corpus with bing lexicon
+
+bing_dtm_4_sentiment <- dtm_4_td %>% 
+    inner_join(get_sentiments("bing"), by=c(term="word"))
+
+# Determine the count of positive v negative terms in lyrics corpus
+
+bing_dtm_4_sentiment %>% 
+    count(document, sentiment, wt = count) %>%
+    spread(sentiment, n, fill = 0) %>%
+    mutate(sentiment= positive - negative)
+
+# Visualize which words contributed to positive and negative sentiment
+
+bing_dtm_4_sentiment %>%
+    count(sentiment, term, wt = count) %>%
+    filter(n >= 100) %>%
+    mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+    mutate(term = reorder(term, n)) %>%
+    ggplot(aes(term, n, fill = sentiment)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ylab("Contribution to sentiment")
+
+
+# Create object called nrc_dtm_sentiment to conduct sentiment analysis of entire lyrics corpus with nrc lexicon
+
+nrc_dtm_4_sentiment <- dtm_4_td %>%
+    inner_join(get_sentiments("nrc"), by=c(term="word"))
+               
+# Get count of each emotion in NRC lexicon
+               
+ nrc_count <- nrc_dtm_4_sentiment %>%
+     group_by(sentiment) %>%
+     filter(!sentiment %in% c("positive","negative")) %>% 
+     count(sentiment,sort=TRUE)
+               
+nrc_count
+               
+# Plot emotions of NRC lexicon to determine highest emotion in corpus lyrics in descending order
+nrc_count %>%
+    ggplot(aes(x=reorder(sentiment,-n),y=n,fill=sentiment)) +
+    geom_bar(stat="identity") +
+    labs(y="Sentiment Scores", x=NULL)
 
 
